@@ -1,0 +1,14 @@
+passenger can be dropped off at wrong hotel, with a reward of -1
+example:
+action is DropOff, current state is (0, 4, 4, 1)
+new state is (0, 4, 2, 1), reward: -1, done: False, truncated: False, info: {'prob': 1.0, 'action_mask': array([0, 1, 0, 0, 1, 0], dtype=int8)}
+
+the termination doesnt happen when taxi drops off in the middle of nowhere, it stays in same state
+but dropping off at wrong hotel is "legal" and will incur timestep penalty
+
+
+we set our environment for passenger to always start at 0 and end at destination 1
+because dropping off at wrong hotel is allowed, we have to also include the cases of passenger being at 2,3,4 in addition to our set starting state of 0,
+so that would be 25*3 = 75 more states to calculate, as the grid has 25 places for the taxi to be
+
+however we do not include the case where passenger is at 1, because that is our destination already, and anytime a taxi drops off passenger at 1, the MDP will reach a terminal state
