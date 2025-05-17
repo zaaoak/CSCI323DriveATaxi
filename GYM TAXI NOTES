@@ -4,7 +4,7 @@ action is DropOff, current state is (0, 4, 4, 1)
 new state is (0, 4, 2, 1), reward: -1, done: False, truncated: False, info: {'prob': 1.0, 'action_mask': array([0, 1, 0, 0, 1, 0], dtype=int8)}
 
 the termination doesnt happen when taxi drops off in the middle of nowhere, it stays in same state
-but dropping off at wrong hotel is "legal" and will incur timestep penalty
+but dropping off at wrong hotel is a "legal move" and will only incur timestep penalty reward(-1)
 
 
 we set our environment for passenger to always start at 0 and end at destination 1
