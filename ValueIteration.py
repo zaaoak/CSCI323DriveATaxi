@@ -189,18 +189,29 @@ for x_taxi, y_taxi, passenger, dest in combinations:
 # data = [row.to_dict() for row in VTable.values()]
 
 # df = pd.DataFrame(data)
-
+optimalAction = [
+    (0,0,0,1),
+    (0,0,4,1),
+    (0,1,4,1),
+    (0,2,4,1),
+    (1,2,4,1),
+    (2,2,4,1),
+    (2,1,4,1),
+    (2,0,4,1),
+    (3,0,4,1),
+    (4,0,4,1),
+]
 # df_sorted = df.sort_values(by=['Passenger', 'x_taxi', 'y_taxi', 'Dest'])
 # # Sort by passenger, then x_taxi, then y_taxi, then dest
 # states.sort(key=lambda s: (s.passenger, s.x_taxi, s.y_taxi, s.dest))
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import pandas as pd
-from tkinter import messagebox
+
 class LivePandasTable:
     def __init__(self, root, initial_df: pd.DataFrame):
         self.root = root
-        self.root.title("Taxi Value Table - Press SPACE to Refresh")
+        self.root.title("Taxi Value Table - Auto Refresh Every 0.2s")
 
         self.tree = ttk.Treeview(root, columns=list(initial_df.columns), show='headings')
         for col in initial_df.columns:
@@ -208,59 +219,65 @@ class LivePandasTable:
             self.tree.column(col, anchor="center", width=90)
         self.tree.pack(expand=True, fill='both')
 
-        self.pending_df = initial_df.copy()
         self.current_df = initial_df.copy()
-
         self.update_table(self.current_df)
-
-        self.root.bind("<space>", self.on_space_press)
 
     def update_table(self, df):
         self.tree.delete(*self.tree.get_children())
         for _, row in df.iterrows():
             self.tree.insert('', 'end', values=list(row))
 
-    def set_new_dataframe(self, new_df: pd.DataFrame):
-        self.pending_df = new_df.copy()
-
-    def on_space_press(self, event=None):
-        self.current_df = self.pending_df.copy()
+    def refresh(self, new_df: pd.DataFrame):
+        self.current_df = new_df.copy()
         self.update_table(self.current_df)
-# Convert dictionary of TaxiStateValueRow to DataFrame
+
+# Initialize DataFrame from VTable objects (your actual VTable logic here)
 data = [row.to_dict() for row in VTable.values()]
 df = pd.DataFrame(data)
 df_sorted = df.sort_values(by=['Passenger', 'x_taxi', 'y_taxi', 'Dest'])
-# Launch a GUI popup with refresh-on-space behavior
+
 root = tk.Tk()
 app = LivePandasTable(root, df_sorted)
 
-# OPTIONAL: If you want to continuously update the underlying data every few seconds (but wait for spacebar to display)
-iteration=1
-def on_space_press(event=None):
-    global iteration
-    # Recalculate and refresh VTable values here
-    epsilonVal = []
+iteration = 1
+converged = False
+
+def auto_update():
+    global iteration, converged
+
+    if converged:
+        return  # stop updates once converged
+
+    epsilonVals = []
+
+    # Recalculate values
     for key, value in VTable.items():
         value.calculateQValues(VTable)
     for key, value in VTable.items():
         value.updateVs()
-        epsilonVal.append(value.epsilon)
+        epsilonVals.append(value.epsilon)
 
-    maxEpsilon = max(epsilonVal)
+    maxEpsilon = max(epsilonVals)
     print(f'iteration: {iteration}, Max Epsilon: {maxEpsilon}')
 
-    # Update DataFrame and UI
+    # Update DataFrame and refresh UI
     updated_data = [row.to_dict() for row in VTable.values()]
-    updated_df = pd.DataFrame(updated_data).sort_values(by=['Passenger', 'x_taxi', 'y_taxi', 'Dest'])
-    
-    app.set_new_dataframe(updated_df)
-    app.on_space_press()
-    if(maxEpsilon<1e-5):
-        messagebox.showinfo("Info", f"epsilon converged at iteration {iteration}")
-    iteration+=1
-# Start periodic updates
+    filtered_data = [
+        row for row in updated_data
+        if (row['x_taxi'], row['y_taxi'], row['Passenger'], row['Dest']) in optimalAction
+    ]
+    updated_df = pd.DataFrame(filtered_data).sort_values(by=['Passenger', 'x_taxi', 'y_taxi', 'Dest'])
+    app.refresh(updated_df)
 
-# Start GUI loop
-root.bind("<space>", on_space_press)
+    if maxEpsilon < 1e-5 and not converged:
+        messagebox.showinfo("Info", f"epsilon converged at iteration {iteration}")
+        converged = True
+
+    iteration += 1
+    if not converged:
+        root.after(200, auto_update)  # schedule next update in 0.2 seconds
+
+# Start auto update loop after 200 ms
+root.after(200, auto_update)
 
 root.mainloop()

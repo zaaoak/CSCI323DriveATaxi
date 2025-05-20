@@ -130,8 +130,8 @@ initial_state = encode_state(taxi_row=0, taxi_col=0, passenger_loc=0, destinatio
 env.unwrapped.s = initial_state
 # Render to verify
 #env.render()
-episodes = 1
-printLastFewEpisodes = 0
+episodes = 10000
+printLastFewEpisodes = 5
 printLastFewEpisodesButOnlyUnOptimal = True
 rewards = []#for keeping track of rewards at each episode
 optimalAction = {
@@ -197,17 +197,17 @@ for i in range(episodes):
                 print_q_table_filtered(q, env, (0,1))
                 print("========================================================\n")
     rewards.append(totalReward)
-    print(f'max delta : {max(qDiff)}')
+    #print(f'max delta : {max(qDiff)}')
 
     #print_q_table_filtered(q, env, (0,1))
     epsilon = epsilon - epsilon_decay
     #print(f'max qdiff: {max(qDiff)}')
-    def Maverage(arr, window_size=100):
-        window = arr[-window_size:]  # last 100 or fewer elements
-        return sum(window) / len(window)
-    if(Maverage(rewards) ==11):
-
-        break
+    # def Maverage(arr, window_size=episodes/10):
+    #     window = arr[-window_size:]  # last 100 or fewer elements
+    #     return sum(window) / len(window)
+    # if(Maverage(rewards) ==11):
+    #     print(f'Threshold reached, function converged')
+    #     break
     # if(max(qDiff) < thresHold):
     #     print(f'Threshold reached, function converged')
     #     print(f"episode {i} ended rewards collected: {totalReward}, current epsilon: {epsilon},current learning rate: {learning_rate}")
@@ -220,7 +220,7 @@ env.close()
 end_time = time.time()
 elapsed_time = end_time - start_time
 print(f"Execution time: {elapsed_time:.4f} seconds")
-def moving_average(data, window_size=100):
+def moving_average(data, window_size=episodes/10):
     return np.convolve(data, np.ones(window_size)/window_size, mode='valid') 
 window_size = 100  # Average over every 100 episodes
 avg_rewards = moving_average(rewards, window_size)
@@ -228,7 +228,7 @@ avg_rewards = moving_average(rewards, window_size)
 #print(env.spec.max_episode_steps)
 plt.plot(avg_rewards)
 plt.xlabel('Episode (offset by window size)')
-plt.ylabel('Average Reward (over {} episodes)'.format(window_size))
+plt.ylabel(f'Average Reward (over {episodes} episodes)'.format(window_size))
 plt.title('Moving Average of Rewards')
 plt.grid(True)
 plt.show()

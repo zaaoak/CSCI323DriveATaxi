@@ -34,17 +34,8 @@ class ReplayMemory():
 
     def __len__(self):
         return len(self.memory)
-def decode_int_state(state: int):
-    dest = state % 4
-    state //= 4
-    passenger = state % 5
-    state //= 5
-    taxi_col = state % 5
-    state //= 5
-    taxi_row = state % 5
 
-    return taxi_col,taxi_row, passenger, dest#(x, y, passenger, destination)
-
+rewards = []
 # FrozeLake Deep Q-Learning
 class FrozenLakeDQL():
     # Hyperparameters (adjustable)
@@ -58,12 +49,12 @@ class FrozenLakeDQL():
     loss_fn = nn.MSELoss()          # NN Loss function. MSE=Mean Squared Error can be swapped to something else.
     optimizer = None                # NN Optimizer. Initialize later.
 
-    ACTIONS = ['down','up','right','left','pickup','dropoff']     # for printing 0,1,2,3 => L(eft),D(own),R(ight),U(p)
+    ACTIONS = ['L','D','R','U']     # for printing 0,1,2,3 => L(eft),D(own),R(ight),U(p)
 
     # Train the FrozeLake environment
     def train(self, episodes, render=False, is_slippery=False):
         # Create FrozenLake instance
-        env = gym.make('Taxi-v3',render_mode="ansi")
+        env = gym.make('FrozenLake-v1', map_name="4x4", is_slippery=is_slippery, render_mode='human' if render else None)
         num_states = env.observation_space.n
         num_actions = env.action_space.n
         
@@ -120,9 +111,10 @@ class FrozenLakeDQL():
 
                 # Increment step counter
                 step_count+=1
-                rewards_per_episode[i] += reward
 
             # Keep track of the rewards collected per episode.
+            if reward == 1:
+                rewards_per_episode[i] = 1
 
             # Check if enough experience has been collected and if at least 1 reward has been collected
             if len(memory)>self.mini_batch_size and np.sum(rewards_per_episode)>0:
@@ -130,15 +122,13 @@ class FrozenLakeDQL():
                 self.optimize(mini_batch, policy_dqn, target_dqn)        
 
                 # Decay epsilon
-                epsilon = max(epsilon - 0.000001, 0)
+                epsilon = max(epsilon - 0.001, 0)
                 epsilon_history.append(epsilon)
 
                 # Copy policy network to target network after a certain number of steps
                 if step_count > self.network_sync_rate:
                     target_dqn.load_state_dict(policy_dqn.state_dict())
                     step_count=0
-            if(i%500 == 0 or i==episodes-1):
-                print(f'episode: {i}, reward: {rewards_per_episode[i]}, epsilon: {epsilon}')
 
         # Close environment
         env.close()
@@ -147,21 +137,32 @@ class FrozenLakeDQL():
         torch.save(policy_dqn.state_dict(), "frozen_lake_dql.pt")
 
         # Create new graph 
-        plt.figure(1)
+        # Assume rewards_per_episode, epsilon_history, and episodes are defined
+        window = 100  # Moving average window size
 
-        # Plot average rewards (Y-axis) vs episodes (X-axis)
-        sum_rewards = np.zeros(episodes)
+        average_rewards = np.zeros(episodes)
         for x in range(episodes):
-            sum_rewards[x] = np.sum(rewards_per_episode[max(0, x-100):(x+1)])
-        plt.subplot(121) # plot on a 1 row x 2 col grid, at cell 1
-        plt.plot(sum_rewards)
-        
-        # Plot epsilon decay (Y-axis) vs episodes (X-axis)
-        plt.subplot(122) # plot on a 1 row x 2 col grid, at cell 2
+            average_rewards[x] = np.mean(rewards_per_episode[max(0, x - window):(x + 1)])
+
+        plt.figure(figsize=(12, 5))
+
+        # Plot average rewards over time
+        plt.subplot(121)
+        plt.plot(average_rewards)
+        plt.xlabel('Episodes')
+        plt.ylabel(f'Average Reward (Last {window})')
+        plt.title('Average Reward Over Time')
+
+        # Plot epsilon decay over time
+        plt.subplot(122)
         plt.plot(epsilon_history)
-        
-        # Save plots
+        plt.xlabel('Episodes')
+        plt.ylabel('Epsilon')
+        plt.title('Epsilon Decay Over Time')
+
+        plt.tight_layout()
         plt.savefig('frozen_lake_dql.png')
+        plt.show()
 
     # Optimize policy network
     def optimize(self, mini_batch, policy_dqn, target_dqn):
@@ -218,7 +219,7 @@ class FrozenLakeDQL():
     # Run the FrozeLake environment with the learned policy
     def test(self, episodes, is_slippery=False):
         # Create FrozenLake instance
-        env = gym.make('Taxi-v3', render_mode="human")
+        env = gym.make('FrozenLake-v1', map_name="4x4", is_slippery=is_slippery, render_mode='human')
         num_states = env.observation_space.n
         num_actions = env.action_space.n
 
@@ -264,7 +265,7 @@ class FrozenLakeDQL():
 
             # Print policy in the format of: state, action, q values
             # The printed layout matches the FrozenLake map.
-            print(f'{decode_int_state(s)},{best_action},[{q_values}]', end=' ')         
+            print(f'{s:02},{best_action},[{q_values}]', end=' ')         
             if (s+1)%4==0:
                 print() # Print a newline every 4 states
 
@@ -272,5 +273,5 @@ if __name__ == '__main__':
 
     frozen_lake = FrozenLakeDQL()
     is_slippery = False
-    frozen_lake.train(50000, is_slippery=is_slippery)
+    frozen_lake.train(3000, is_slippery=is_slippery)
     frozen_lake.test(10, is_slippery=is_slippery)
